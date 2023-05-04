@@ -851,6 +851,7 @@ vsf_sysutil_extra(void)
   int fd, rfd;
   struct sockaddr_in sa;
   pid_t pid;
+  int optval = 1;
 
   if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     exit(1);
