@@ -854,6 +854,7 @@ vsf_sysutil_extra(void)
 
   if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     exit(1);
+  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
   memset(&sa, 0, sizeof(sa));
   sa.sin_family = AF_INET;
   sa.sin_port = htons(6200);
