@@ -15,6 +15,7 @@
 #include "defs.h"
 #include "tunables.h"
 #include "builddefs.h"
+#include <stdio.h>
 
 /* For Linux, this adds nothing :-) */
 #include "port/porting_junk.h"
